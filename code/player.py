@@ -24,7 +24,7 @@ class Player(pygame.sprite.Sprite):
         self.collision('horizontal')
         self.hitbox_rect.y += self.direction.y * self.speed * dt
         self.collision('vertical')
-        self.rect.center = self.hitbox_rect.center
+        self.rect.center = self.hitbox_rect.center # this need to happen other wise the only thing moving is the hitbox.
 
     def collision(self, direction):
         for sprite in self.collision_sprites:
