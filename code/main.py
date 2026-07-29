@@ -41,6 +41,9 @@ class Game:
         self.music.set_volume(0.1)
         self.music.play(-1)
 
+        # load font
+        self.font = pygame.font.Font(join("..", "images", "Oxanium-Bold.ttf"), 40)
+
         self.load_images()
         self.setup()
 
@@ -90,19 +93,31 @@ class Game:
             else:
                 self.spawn_positions.append((obj.x, obj.y))
 
-    def collisions(self):
+    def bullet_collisions(self):
+        if self.bullet_sprites:
+            # collisions bullet with enemy
+            for bullet in self.bullet_sprites:
+                collided_sprite = pygame.sprite.spritecollide(bullet, self.enemy_sprites, False, pygame.sprite.collide_mask)
+                if collided_sprite:
+                    for sprite in collided_sprite:
+                        self.impact_sound.play()
+                        sprite.destroy()
+                    bullet.kill()
+    
+    def player_collision(self):
         # collisions enemy with player
-        #collision_sprite = pygame.sprite.spritecollide(self.player, self.enemy_sprites, False)
-        #if collision_sprite:
-        #    self.running = False
+        if pygame.sprite.spritecollide(self.player, self.enemy_sprites, False, pygame.sprite.collide_mask):
+            self.player.take_damage(1)
+            print(self.player.hp)
+            if self.player.hp <= 0:
+                self.running = False
 
-        # collisions bullet with enemy
-        for bullet in self.bullet_sprites:
-            collided_sprite = pygame.sprite.spritecollide(bullet, self.enemy_sprites, True)
-            if collided_sprite:
-                self.impact_sound.play()
-                bullet.kill()
-
+    def display_health(self):
+        health_str = f"{self.player.hp}|{self.player.max_hp}"
+        text_surf = self.font.render(health_str, True, (240,240,240))
+        text_rect = text_surf.get_frect(midbottom = (100, 100))
+        self.display_surface.blit(text_surf, text_rect)
+        pygame.draw.rect(self.display_surface, (240,240,240), text_rect.inflate(20, 15).move(0,-5), 8, 10)
 
     def run(self):
         while self.running:
@@ -120,12 +135,14 @@ class Game:
             # update
             self.gun_timer()
             self.input()
-            self.collisions()
+            self.bullet_collisions()
+            self.player_collision()
             self.all_sprites.update(dt)
 
             # draw 
             self.display_surface.fill('grey')
             self.all_sprites.draw(self.player.rect.center)
+            self.display_health()
             pygame.display.update()
 
         pygame.quit()

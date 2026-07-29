@@ -9,7 +9,15 @@ class Player(pygame.sprite.Sprite):
         self.image = pygame.image.load(join("..", "images", "player", "down", "0.png")).convert_alpha()
         self.rect = self.image.get_frect(center= pos)
         self.hitbox_rect = self.rect.inflate(-60,-90)
+
+        # health
+        self.hp = 10
+        self.max_hp = self.hp
         
+        self.can_take_damage = True
+        self.flash_duration = 100
+        self.damage_cooldown = 1000
+        self.damage_time = 0
 
         # movement
         self.direction = pygame.math.Vector2()
@@ -50,6 +58,36 @@ class Player(pygame.sprite.Sprite):
                     if self.direction.y > 0: self.hitbox_rect.bottom = sprite.rect.top
                     if self.direction.y < 0: self.hitbox_rect.top = sprite.rect.bottom
 
+    def take_damage(self, ammount):
+        if not self.can_take_damage:
+            return
+
+        self.hp -= ammount
+
+        self.can_take_damage = False
+        self.damage_time = pygame.time.get_ticks()
+
+    def damage_timer(self):
+        if not self.can_take_damage:
+            elapsed = pygame.time.get_ticks() - self.damage_time
+
+            if elapsed >= self.damage_cooldown:
+                self.can_take_damage = True
+
+    def flicker(self):
+        elapsed = pygame.time.get_ticks() - self.damage_time
+
+        if elapsed < self.flash_duration:
+            white = pygame.mask.from_surface(self.image).to_surface()
+            white.set_colorkey((0,0,0))
+            self.image = white
+
+        else:
+            if int(pygame.time.get_ticks() / 100) % 2:
+                self.image.set_alpha(80)
+            else:
+                self.image.set_alpha(255)
+
     def animate(self, dt):
         # get state
         if self.direction.x != 0:
@@ -59,10 +97,15 @@ class Player(pygame.sprite.Sprite):
 
         # animate state
         self.frame_index = self.frame_index + 6 * dt if self.direction else 0
-        self.image = self.frames[self.state][int(self.frame_index) % len(self.frames[self.state])]
+        frame = self.frames[self.state][int(self.frame_index) % len(self.frames[self.state])]
+        self.image = frame.copy()
+
+        if not self.can_take_damage:
+            self.flicker()
 
     def update(self, dt):
         self.input()
         self.move(dt)
         self.animate(dt)
+        self.damage_timer()
 
