@@ -5,7 +5,7 @@ from sprites import *
 from pytmx.util_pygame import load_pygame
 from groups import AllSprites
 
-from random import randint
+from random import randint, choice
 
 class Game:
     def __init__(self):
@@ -15,26 +15,54 @@ class Game:
         self.display_surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.running = True
         self.clock = pygame.time.Clock()
-        self.load_images()
+                
         # grop
         self.all_sprites = AllSprites()
         self.collision_sprites = pygame.sprite.Group()
         self.bullet_sprites = pygame.sprite.Group()
+        self.enemy_sprites = pygame.sprite.Group()
         
-        self.setup()
-
         # gun timer
         self.can_shoot = True
         self.shoot_time = 0
         self.gun_cooldown = 100
+        
+        # enemy timer
+        self.enemy_event = pygame.event.custom_type()
+        pygame.time.set_timer(self.enemy_event, 300)
+        self.spawn_positions = []
+
+        # load sounds
+        self.impact_sound = pygame.mixer.Sound(join("..", "audio", "impact.ogg"))
+        self.impact_sound.set_volume(0.2)
+        self.shoot_sound = pygame.mixer.Sound(join("..", "audio", "shoot.wav"))
+        self.shoot_sound.set_volume(0.05)
+        self.music = pygame.mixer.Sound(join("..", "audio", "music.wav"))
+        self.music.set_volume(0.1)
+        self.music.play(-1)
+
+        self.load_images()
+        self.setup()
+
 
     def load_images(self):
         self.bullet_surf = pygame.image.load(join("..", "images", "gun", "bullet.png")).convert_alpha()
+        
+        folders = list(walk(join("..", "images", "enemies")))[0][1]
+        self.enemy_frames = {}
+        for folder in folders:
+            for folder_path, _, file_names in walk(join("..", "images", "enemies", folder)):
+                self.enemy_frames[folder] = []
+                for file_name in sorted(file_names, key= lambda name: int(name.split(".")[0])):
+                    full_path = join(folder_path, file_name)
+                    surf = pygame.image.load(full_path).convert_alpha()
+                    self.enemy_frames[folder].append(surf)
 
     def input(self):
         if pygame.mouse.get_pressed()[0] and self.can_shoot:
             pos = self.gun.rect.center + self.gun.player_direction * 50
             Bullet(self.bullet_surf, pos, self.gun.player_direction, (self.all_sprites, self.bullet_sprites))
+            self.shoot_sound.play()
             self.can_shoot = False
             self.shoot_time = pygame.time.get_ticks()
 
@@ -59,6 +87,21 @@ class Game:
             if obj.name == "Player":
                 self.player = Player((obj.x, obj.y), self.all_sprites, self.collision_sprites)
                 self.gun = Gun(self.player, self.all_sprites)
+            else:
+                self.spawn_positions.append((obj.x, obj.y))
+
+    def collisions(self):
+        # collisions enemy with player
+        #collision_sprite = pygame.sprite.spritecollide(self.player, self.enemy_sprites, False)
+        #if collision_sprite:
+        #    self.running = False
+
+        # collisions bullet with enemy
+        for bullet in self.bullet_sprites:
+            collided_sprite = pygame.sprite.spritecollide(bullet, self.enemy_sprites, True)
+            if collided_sprite:
+                self.impact_sound.play()
+                bullet.kill()
 
 
     def run(self):
@@ -71,9 +114,13 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
 
+                if event.type == self.enemy_event:
+                    Enemy(choice(self.spawn_positions), choice(list(self.enemy_frames.values())), (self.all_sprites, self.enemy_sprites), self.player, self.collision_sprites)
+
             # update
             self.gun_timer()
             self.input()
+            self.collisions()
             self.all_sprites.update(dt)
 
             # draw 
